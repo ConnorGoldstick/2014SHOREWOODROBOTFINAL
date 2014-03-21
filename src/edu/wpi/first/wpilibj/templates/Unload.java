@@ -11,7 +11,7 @@ public class Unload extends Thread {
 
     Victor victor;
     Solenoid sol4, sol5;
-    public final double UNLOADING_SPEED = -0.4;
+    public final double UNLOADING_SPEED = -0.5;
 
     public Unload(Victor v, Solenoid s4, Solenoid s5) {
         victor = v;

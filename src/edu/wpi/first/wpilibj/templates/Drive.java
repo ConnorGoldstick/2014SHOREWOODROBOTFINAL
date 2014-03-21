@@ -18,7 +18,7 @@ public class Drive extends Thread {
     boolean running = false;
     double speed, turn, leftspeed, rightspeed;
     public final double DEADZONE_AMOUNT_TURN = 0.1;
-    public final double TURNING_COEFFICENT = 0.5;
+    public final double TURNING_COEFFICENT = 0.75;
     public final double RAMP_AMOUNT = 0.1;
     public final double STOP_SKIPPING = 0.075;
     public final double DEAD_ZONE = 0.05;

@@ -16,6 +16,7 @@ public class loadAndShoot extends Thread {
     DigitalInput digi14, digi13, digi3;
     Joystick xBox;
     Shoot shooter;
+    DigitalOutput readyShoot;
     boolean shooting = false; //starts the catapult
     int ShootCount = 0;
     Load Load;
@@ -30,14 +31,14 @@ public class loadAndShoot extends Thread {
     int suckingCount = 0;
     boolean doNotSuck = false; //stops the autosuction from screwing up
     SmartDashboard smart;
-    public final double LOADARM_REST_ANGLE = 3.7;
+    public final double LOADARM_REST_ANGLE = 3.6;
     public final double LOADARM_REST_ADJUSTMENT_SPEED = 0.4;
     public final double LOADARM_UNLOADED_MIN_THESHOLD = 2.5;
-    public final double LOADARM_UNLOADED_THESHOLD = 3.8;
+    public final double LOADARM_UNLOADED_THESHOLD = 3.6;
     public final int SHOOT_COUNT_MAX = 155;
     public final int SUCTION_COUNT_MAX = 100;
 
-    public loadAndShoot(AnalogChannel e, Victor v, Solenoid s4, Solenoid s5, Solenoid s7, Solenoid s8, Joystick x, DigitalInput d14, DigitalInput d13, DigitalInput d3, SmartDashboard sd) {
+    public loadAndShoot(AnalogChannel e, Victor v, Solenoid s4, Solenoid s5, Solenoid s7, Solenoid s8, Joystick x, DigitalInput d14, DigitalInput d13, DigitalInput d3, SmartDashboard sd, DigitalOutput rs) {
         victor = v;
         encoder = e;
 
@@ -54,6 +55,7 @@ public class loadAndShoot extends Thread {
         digi3 = d3;
 
         smart = sd;
+        readyShoot = rs;
 
         shooter = new Shoot(sol4, sol5, sol7, sol8);
         Load = new Load(victor, encoder);
@@ -109,6 +111,7 @@ public class loadAndShoot extends Thread {
                 boolean rightBumper = xBox.getRawButton(6);
                 double leftRightTrigger = xBox.getRawAxis(3);
                 double dPad = xBox.getRawAxis(6);
+
                 smart.putBoolean("auto suction enabled", !doNotSuck && okToSuck);
                 if (dPad == -1) {
                     System.out.println("reset everything");
@@ -146,6 +149,7 @@ public class loadAndShoot extends Thread {
                 //start end load
                 if (digi3.get() && !unloading) {//stops the loading
                     endLoading();
+                    setReadyShootLED();
                 }
                 // end end load
 
@@ -175,6 +179,7 @@ public class loadAndShoot extends Thread {
                 //begin shooter
                 if (leftRightTrigger < -.95 && !loadingWithBall && !loadingWithoutBall && !unloading && !shooting) {
                     System.out.println("start shooting");
+                    setReadyShootLED();
                     shooting = true;
                     shooter.setCountToZero(); //resets the count in the class to zero
                 }
@@ -265,5 +270,14 @@ public class loadAndShoot extends Thread {
         victor.set(0); //stops the victor movement
         sucking = false;
         doNotSuck = true; //prevents the autosuction from activating again
+    }
+
+    public void setReadyShootLED(){
+        if(loadingWithBall){
+            readyShoot.set(true);
+        }
+        if(shooting){
+            readyShoot.set(false);
+        }
     }
 }

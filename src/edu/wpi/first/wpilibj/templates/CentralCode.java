@@ -19,10 +19,11 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
  */
 public class CentralCode extends IterativeRobot {
 
-    final int autoMoveForwardTime = 1; // needs testing
-    final double AUTO_MOVE_FORWARD_SPEED = 0.6;
-    final double AUTO_DISTANCE = 0.85;
-    final int AUTO_GYRO_REDUCTION = 90;
+    public final int autoMoveForwardTime = 1; // needs testing
+    public final double AUTO_MOVE_FORWARD_SPEED = 0.6;
+    public final double AUTO_DISTANCE = 0.7;
+    public final int AUTO_GYRO_REDUCTION = 90;
+    public final int AUTO_WAIT_TIME = 1;
     Timer autoTimer;
     Jaguar jag1, jag2, jag3, jag4;
     Joystick xBox;
@@ -32,10 +33,11 @@ public class CentralCode extends IterativeRobot {
              * , relayCompressor
              */;
     DigitalInput digi14, digi13, digi3;
-    DigitalOutput teamColor, speedColor;
+    DigitalOutput teamColor, speedColor, suckingLED, readyShoot;
     AnalogChannel ultrasonic, encoder;
     Gyro gyro;
-    boolean inRange, tooClose, tooFar;
+    boolean inRange, tooClose, tooFar, autoStop, autonomousStopped;
+    double autoTimeAtStop;
     Drive drive;
     loadAndShoot loadAndShoot;
     SmartDashboard smart;
@@ -68,10 +70,12 @@ public class CentralCode extends IterativeRobot {
         digi14 = new DigitalInput(1, 14);
         digi13 = new DigitalInput(1, 12);
         digi3 = new DigitalInput(1, 3);
-        
+
         driverstation = DriverStation.getInstance();
         teamColor = new DigitalOutput(1, 7);
         speedColor = new DigitalOutput(1, 8);
+        suckingLED = new DigitalOutput(1, 9);
+        readyShoot = new DigitalOutput(1, 6);
 
         encoder = new AnalogChannel(2);
         ultrasonic = new AnalogChannel(3);
@@ -85,7 +89,7 @@ public class CentralCode extends IterativeRobot {
 
 
         drive = new Drive(jag1, jag2, jag3, jag4, sol1, sol2, xBox, speedColor);
-        loadAndShoot = new loadAndShoot(encoder, victor, sol4, sol5, sol7, sol8, xBox, digi14, digi13, digi3, smart);
+        loadAndShoot = new loadAndShoot(encoder, victor, sol4, sol5, sol7, sol8, xBox, digi14, digi13, digi3, smart, readyShoot);
 
         drive.start();
         loadAndShoot.start();
@@ -97,8 +101,6 @@ public class CentralCode extends IterativeRobot {
      * This function is called periodically during autonomous
      */
     public void autonomousInit() {
-        //relayCompressor.set(Relay.Value.kOn);
-
         autoTimer.reset();
         autoTimer.start();
 
@@ -106,26 +108,41 @@ public class CentralCode extends IterativeRobot {
         relay.set(Relay.Value.kOn);
 
         setSpeedFast();
+        setLEDTeamColour();
 
         sol4.set(false);
         sol5.set(true);
         sol7.set(true);
         sol8.set(false);
 
+        autoStop = false;
+        autonomousStopped = false;
+        autoTimeAtStop = 99999;
+
         drive.setRun(false);
         loadAndShoot.setRun(false);
+        autoForward();
     }
 
     public void autonomousPeriodic() {
+        relay.set(Relay.Value.kOn);
+        smart.putNumber("distance", ultrasonic.getVoltage());
         drive.setRun(false);
         loadAndShoot.setRun(false);
         //    relay.set(Relay.Value.kOn);
         if (autoTimer.get() < autoMoveForwardTime) {
-            autoForward();
             System.out.println("Moving forward, Timer at " + autoTimer.get() + ", Ultrasonic at " + ultrasonic.getAverageVoltage());
         }
         if (autoTimer.get() >= autoMoveForwardTime && ultrasonic.getAverageVoltage() <= AUTO_DISTANCE) {
             stop();
+            if (!autonomousStopped) {
+                autonomousStopped = true;
+                autoTimeAtStop = autoTimer.get();
+            }
+            System.out.println("Stopped, Ultrasonic at " + ultrasonic.getAverageVoltage());
+        }
+        if (autoTimer.get() >= autoTimeAtStop + 1 && ultrasonic.getAverageVoltage() <= AUTO_DISTANCE) {
+            autoStop = true;
             shoot();
             System.out.println("Shooting, Ultrasonic at " + ultrasonic.getAverageVoltage());
         }
@@ -140,11 +157,12 @@ public class CentralCode extends IterativeRobot {
         drive.setRun(true);
         loadAndShoot.teleoperatedInit();
         loadAndShoot.setRun(true);
-        setLEDColour();
     }
 
     public void teleopPeriodic() {
-        //relayCompressor.set(Relay.Value.kOn);
+        smart.putNumber("distance", ultrasonic.getVoltage());
+        setSuckingLED();
+        setLEDTeamColour();
 
         //smart dashboard stuff
         smart.putBoolean("Fully Pressurized", compressor.getPressureSwitchValue());
@@ -159,14 +177,14 @@ public class CentralCode extends IterativeRobot {
         smart.putBoolean("too far right", (gyro.getAngle() > 30 && gyro.getAngle() < 180) || gyro.getAngle() < -180);
         smart.putBoolean("too far left", (gyro.getAngle() < -30 && gyro.getAngle() > -180) || gyro.getAngle() > 180);
 
-        if (ultrasonic.getVoltage() < 0.5) {
+        if (ultrasonic.getVoltage() < 0.55) {
             tooClose = true;
         } else {
             tooClose = false;
         }
         smart.putBoolean("Too close", tooClose);
 
-        if (ultrasonic.getVoltage() > 1) {
+        if (ultrasonic.getVoltage() > 0.8) {
             tooFar = true;
         } else {
             tooFar = false;
@@ -191,7 +209,10 @@ public class CentralCode extends IterativeRobot {
      * This function is called periodically during test mode
      */
     public void testPeriodic() {
-        //relayCompressor.set(Relay.Value.kOn);
+        jag1.set(0);
+        jag2.set(0);
+        jag3.set(0);
+        jag4.set(0);
         System.out.println(compressor.getPressureSwitchValue());
     }
 
@@ -223,13 +244,22 @@ public class CentralCode extends IterativeRobot {
         jag3.set(AUTO_MOVE_FORWARD_SPEED);// - (gyro.getAngle()/AUTO_GYRO_REDUCTION));
         jag4.set(AUTO_MOVE_FORWARD_SPEED);// - (gyro.getAngle()/AUTO_GYRO_REDUCTION));
     }
-    
-    public void setLEDColour(){
-        System.out.println(driverstation.getAlliance());
-        if (driverstation.getAlliance() == DriverStation.Alliance.kBlue) {
+
+    public void setLEDTeamColour() {
+        //System.out.println(driverstation.getAlliance().name);
+        if (driverstation.getAlliance().name.startsWith("B")) {
+            System.out.println("Blue");
             teamColor.set(true);
-        } else{
+        } else {
             teamColor.set(false);
+        }
+    }
+
+    public void setSuckingLED() {
+        if (sol4.get() == false && sol5.get() == true) {
+            suckingLED.set(true);
+        } else {
+            suckingLED.set(false);
         }
     }
 }

@@ -11,7 +11,7 @@ public class Load extends Thread {
 
     Victor victor;
     AnalogChannel encoder;
-    public final double LOADSPEED_WITH_BALL = 1;
+    public final double LOADSPEED_WITH_BALL = 0.9;
     public final double LOADSPEED_WITHOUT_BALL = 0.5;
     public final double LOADSPEED_AFTER_APEX = 0.2;
     public final double ENCODER_ANGLE_STOP = 0.5;
